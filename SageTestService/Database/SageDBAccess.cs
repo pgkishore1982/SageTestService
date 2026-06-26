@@ -14,10 +14,24 @@ namespace SageTestService.Database
             try
             {
                 Log.Information("SageDBAccess connection string: " + todbc.ConnectionString.ToString());
+                Log.Information("Connection state before open: " + todbc.State);
+                
                 todbc.Open();
+               
                 Log.Information("Database connection State: " + todbc.State);
-                String? result = null;
 
+                if (todbc.State == System.Data.ConnectionState.Open)
+                {
+                   
+                    Log.Information("Database connection opened successfully. State: " + todbc.State);
+                }
+                else
+                {
+                   
+                    Log.Error("Database connection FAILED to open. State: " + todbc.State);
+                    return $"Connection failed. State: {todbc.State}";
+                }
+                String? result = null;
                 string jobId = "YOUR_JOB_ID"; 
                 string checkSql = $"SELECT Status FROM MASTER_JCM_JOB_1 WHERE Job = '{jobId}'";
                 Log.Information("Inline query: " + checkSql);
