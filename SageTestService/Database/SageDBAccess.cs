@@ -7,52 +7,58 @@ namespace SageTestService.Database
  
     public class SageDBAccess
     {       
-        public static async Task<String> OpenJob(string jobNo)
-        {           
-            using (var todbc = DbConnection.GetOdbcConnection())
-            {
-                try
-                {
-                    Log.Information("SageDBAccess connection string: "+ todbc.ConnectionString.ToString());
-                    await todbc.OpenAsync();
-                    String? result = null;
-                    if (!string.IsNullOrEmpty(jobNo))
-                    {
-                        Log.Information("Open dataBase connection : "+ "Successs");
-                        string checkSql = $"SELECT Status FROM MASTER_JCM_JOB_1 WHERE LOWER(Status) = 'closed' AND Job = ?";
-                        using (var cmd = new OdbcCommand(checkSql, todbc))
-                        {
-                            cmd.Parameters.AddWithValue("@Job", jobNo);
-                            var reader = await cmd.ExecuteReaderAsync();
-                            Log.Information("data reader :" + reader.HasRows);
-                            if (reader.HasRows)
-                            {
-                                
-                                string updateSql = "UPDATE MASTER_JCM_JOB_1 SET Status = 'inprogress' WHERE Job = ?";
-                                using (var updateCmd = new OdbcCommand(updateSql, todbc))
-                                {
-                                    updateCmd.Parameters.AddWithValue("@Job", jobNo);
-                                   var r= await updateCmd.ExecuteNonQueryAsync();
-                                    Log.Information("update result :" + r.ToString());
-                                    result =r.ToString();
-                                }
-                            }
-                            else
-                            {
-                                result = "no rows found";
-                            }
-                        }
-                    }
+        public static async Task<String> OpenJob()
+        {
+            var todbc = DbConnection.GetOdbcConnection();
 
-                    return result;
-                }
-                catch (Exception ex)
+            try
+            {
+                Log.Information("SageDBAccess connection string: " + todbc.ConnectionString.ToString());
+                todbc.Open();
+                Log.Information("Database connection State: " + todbc.State);
+                String? result = null;
+
+                string jobId = "YOUR_JOB_ID"; 
+                string checkSql = $"SELECT Status FROM MASTER_JCM_JOB_1 WHERE Job = '{jobId}'";
+                Log.Information("Inline query: " + checkSql);
+
+
+                var cmd = new OdbcCommand(checkSql, todbc);
+                var reader = await cmd.ExecuteReaderAsync();
+                Log.Information("Data reader HasRows: " + reader.HasRows);
+
+                if (reader.HasRows)
                 {
-                    Log.Error("DB access issue : "+ ex.Message.ToString());
-                    string exception=ex.Message.ToString();
-                    return exception;                   
+                    while (await reader.ReadAsync())
+                    {
+                        string status = reader["Status"]?.ToString() ?? string.Empty;
+                        Log.Information("Record found - Status: " + status);
+                        result = status;
+                    }
+                }
+                else
+                {
+                   
+                    Log.Warning("No data found with this Job ID.");
+                    result = "no rows found";
+                }
+
+                return result ?? "no rows found";
+            }
+            catch (Exception ex)
+            {               
+                Log.Error("DB access exception: " + ex.Message);
+                return ex.Message;
+            }
+            finally
+            {
+                if (todbc.State == System.Data.ConnectionState.Open)
+                {
+                    todbc.Close();                   
+                    Log.Information("Database connection closed.");
                 }
             }
+
         }
     }
 }
