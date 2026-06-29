@@ -2,6 +2,7 @@
 using System.Configuration;
 using System.Data;
 using System.Data.Odbc;
+
 namespace SageTestService.Database
 {
  
@@ -9,16 +10,25 @@ namespace SageTestService.Database
     {       
         public static async Task<String> OpenJob()
         {
-            var todbc = DbConnection.GetOdbcConnection();
+            OdbcConnection todbc1 = new OdbcConnection(System.Configuration.ConfigurationManager.AppSettings["OdbcConnectionString"]);
 
             try
             {
-                Log.Information("SageDBAccess connection string: " + todbc.ConnectionString.ToString());
-                Log.Information("Connection state before open: " + todbc.State);
-                
-                todbc.Open();
-               
-                Log.Information("Database connection State: " + todbc.State);
+                Log.Information("SageDBAccess connection string: " + todbc1.ConnectionString.ToString());
+                Log.Information("Connection state before open: " + todbc1.State);
+                Log.Information("Try catch block added for open connection");
+                try
+                {
+                    string connectionString =System.Configuration.ConfigurationManager.AppSettings["OdbcConnectionString"];
+                    using var todbc = new OdbcConnection(connectionString);
+                    //OdbcConnection todbc = new OdbcConnection(connectionString);
+                   // Log.Information("SageDBAccess connection string: " + todbc.ConnectionString.ToString());
+                   var conopen=  todbc.OpenAsync().Exception.Message.ToString();
+                    Log.Information("SageDBAccess connection string state: " + conopen);
+
+                    //await todbc.OpenAsync();
+
+                    Log.Information("Database connection State: " + todbc.State);
 
                 if (todbc.State == System.Data.ConnectionState.Open)
                 {
@@ -32,7 +42,7 @@ namespace SageTestService.Database
                     return $"Connection failed. State: {todbc.State}";
                 }
                 String? result = null;
-                string jobId = "YOUR_JOB_ID"; 
+                string jobId = " 268295-1"; 
                 string checkSql = $"SELECT Status FROM MASTER_JCM_JOB_1 WHERE Job = '{jobId}'";
                 Log.Information("Inline query: " + checkSql);
 
@@ -53,11 +63,15 @@ namespace SageTestService.Database
                 else
                 {
                    
-                    Log.Warning("No data found with this Job ID.");
+                    Log.Warning("No data found with this Job ID:  268295-1");
                     result = "no rows found";
                 }
 
                 return result ?? "no rows found";
+                }
+                catch (Exception ex)
+                { Log.Information("Database Open exception error : " + ex.Message.ToString()); throw; }
+
             }
             catch (Exception ex)
             {               
@@ -66,9 +80,9 @@ namespace SageTestService.Database
             }
             finally
             {
-                if (todbc.State == System.Data.ConnectionState.Open)
+                if (todbc1.State == System.Data.ConnectionState.Open)
                 {
-                    todbc.Close();                   
+                    todbc1.Close();                   
                     Log.Information("Database connection closed.");
                 }
             }
