@@ -8,85 +8,61 @@ namespace SageTestService.Database
  
     public class SageDBAccess
     {       
-        public static async Task<String> OpenJob()
+        public static async Task OpenJob()
         {
-            OdbcConnection todbc1 = new OdbcConnection(System.Configuration.ConfigurationManager.AppSettings["OdbcConnectionString"]);
 
             try
             {
-                Log.Information("SageDBAccess connection string: " + todbc1.ConnectionString.ToString());
-                Log.Information("Connection state before open: " + todbc1.State);
+
                 Log.Information("Try catch block added for open connection");
-                try
+
+                string? result = null;
+                string jobId = "268295-1";
+
+                string connectionString = System.Configuration.ConfigurationManager.AppSettings["OdbcConnectionString"]
+                    ?? throw new InvalidOperationException("OdbcConnectionString not found in config.");
+
+                 using var connection = new OdbcConnection(connectionString);
+               
+                Log.Information("Opening ODBC connection...");
+                if (connection != null)
                 {
-                    string connectionString =System.Configuration.ConfigurationManager.AppSettings["OdbcConnectionString"];
-                    using var todbc = new OdbcConnection(connectionString);
-                    //OdbcConnection todbc = new OdbcConnection(connectionString);
-                   // Log.Information("SageDBAccess connection string: " + todbc.ConnectionString.ToString());
-                   var conopen=  todbc.OpenAsync().Exception.Message.ToString();
-                    Log.Information("SageDBAccess connection string state: " + conopen);
-
-                    //await todbc.OpenAsync();
-
-                    Log.Information("Database connection State: " + todbc.State);
-
-                if (todbc.State == System.Data.ConnectionState.Open)
-                {
-                   
-                    Log.Information("Database connection opened successfully. State: " + todbc.State);
+                    connection.Open();
+                    Log.Information("ODBC connection opened successfully." + connection.State);
                 }
                 else
                 {
-                   
-                    Log.Error("Database connection FAILED to open. State: " + todbc.State);
-                    return $"Connection failed. State: {todbc.State}";
+                    Log.Information("ODBC connection is null." + connection.Driver.ToString());
                 }
-                String? result = null;
-                string jobId = " 268295-1"; 
-                string checkSql = $"SELECT Status FROM MASTER_JCM_JOB_1 WHERE Job = '{jobId}'";
-                Log.Information("Inline query: " + checkSql);
+                    const string sql = "SELECT Status FROM MASTER_JCM_JOB_1 WHERE Job ='268295-1'";
 
+                 using var cmd = new OdbcCommand(sql, connection);
+                //cmd.Parameters.Add("@jobId", OdbcType.VarChar).Value = jobId;
 
-                var cmd = new OdbcCommand(checkSql, todbc);
-                var reader = await cmd.ExecuteReaderAsync();
-                Log.Information("Data reader HasRows: " + reader.HasRows);
+                 using var reader =  cmd.ExecuteReaderAsync();
 
-                if (reader.HasRows)
+                if (reader.Result.Read())
                 {
-                    while (await reader.ReadAsync())
-                    {
-                        string status = reader["Status"]?.ToString() ?? string.Empty;
-                        Log.Information("Record found - Status: " + status);
-                        result = status;
-                    }
+                    var status = reader.Result["Status"]?.ToString();
+                    Log.Information("Job {JobId} status: {Status}", jobId, status);
                 }
                 else
                 {
-                   
-                    Log.Warning("No data found with this Job ID:  268295-1");
-                    result = "no rows found";
+                    Log.Warning("No job found for JobId: {JobId}", jobId);
                 }
 
-                return result ?? "no rows found";
-                }
-                catch (Exception ex)
-                { Log.Information("Database Open exception error : " + ex.Message.ToString()); throw; }
-
+            }
+            catch (OdbcException ex)
+            {
+                Log.Error("Failed to connect ODBC. Error: " + ex );
+                throw;
             }
             catch (Exception ex)
-            {               
-                Log.Error("DB access exception: " + ex.Message);
-                return ex.Message;
-            }
-            finally
             {
-                if (todbc1.State == System.Data.ConnectionState.Open)
-                {
-                    todbc1.Close();                   
-                    Log.Information("Database connection closed.");
-                }
+                Log.Error("DB access exception: " + ex);
+                throw;
             }
-
+            
         }
     }
 }
